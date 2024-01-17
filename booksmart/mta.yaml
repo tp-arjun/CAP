@@ -1,0 +1,94 @@
+_schema-version: "3.1"
+ID: booksmart
+description: A simple CAP project.
+version: 1.0.0
+modules:
+  - name: booksmart-srv
+    type: nodejs
+    path: gen/srv
+    requires:
+      - name: booksmart-db
+      - name: uaa_booksmart
+    provides:
+      - name: srv-api
+        properties:
+          srv-url: ${default-url}
+    parameters:
+      buildpack: nodejs_buildpack
+    build-parameters:
+      builder: npm
+  - name: booksmart-db-deployer
+    type: hdb
+    path: gen/db
+    requires:
+      - name: booksmart-db
+    parameters:
+      buildpack: nodejs_buildpack
+  - name: booksmart-destination-content
+    type: com.sap.application.content
+    requires:
+      - name: booksmart-destination-service
+        parameters:
+          content-target: true
+      - name: booksmart_html_repo_host
+        parameters:
+          service-key:
+            name: booksmart_html_repo_host-key
+      - name: uaa_booksmart
+        parameters:
+          service-key:
+            name: uaa_booksmart-key
+    parameters:
+      content:
+        instance:
+          destinations:
+            - Name: managedapprouter_booksmart_html_repo_host
+              ServiceInstanceName: booksmart-html5-app-host-service
+              ServiceKeyName: booksmart_html_repo_host-key
+              sap.cloud.service: managedapprouter
+            - Authentication: OAuth2UserTokenExchange
+              Name: managedapprouter_uaa_booksmart
+              ServiceInstanceName: booksmart-xsuaa-service
+              ServiceKeyName: uaa_booksmart-key
+              sap.cloud.service: managedapprouter
+          existing_destinations_policy: ignore
+    build-parameters:
+      no-source: true
+resources:
+  - name: booksmart-db
+    type: com.sap.xs.hdi-container
+    parameters:
+      service: hana
+      service-plan: hdi-shared
+  - name: booksmart-destination-service
+    type: org.cloudfoundry.managed-service
+    parameters:
+      config:
+        HTML5Runtime_enabled: true
+        version: 1.0.0
+      service: destination
+      service-name: booksmart-destination-service
+      service-plan: lite
+  - name: booksmart_html_repo_host
+    type: org.cloudfoundry.managed-service
+    parameters:
+      service: html5-apps-repo
+      service-name: booksmart-html5-app-host-service
+      service-plan: app-host
+  - name: uaa_booksmart
+    type: org.cloudfoundry.managed-service
+    parameters:
+      path: ./xs-security.json
+      service: xsuaa
+      service-name: booksmart-xsuaa-service
+      service-plan: application
+      config:
+        xsappname: booksmart-${org}-${space}
+        tenant-mode: dedicated
+parameters:
+  enable-parallel-deployments: true
+build-parameters:
+  before-all:
+    - builder: custom
+      commands:
+        - npx cds build --production
