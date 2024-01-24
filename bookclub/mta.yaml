@@ -1,0 +1,94 @@
+_schema-version: "3.1"
+ID: bookclub
+description: A simple CAP project.
+version: 1.0.0
+modules:
+  - name: bookclub-srv
+    type: nodejs
+    path: gen/srv
+    requires:
+      - name: bookclub-db
+      - name: uaa_bookclub
+    provides:
+      - name: srv-api
+        properties:
+          srv-url: ${default-url}
+    parameters:
+      buildpack: nodejs_buildpack
+    build-parameters:
+      builder: npm
+  - name: bookclub-db-deployer
+    type: hdb
+    path: gen/db
+    requires:
+      - name: bookclub-db
+    parameters:
+      buildpack: nodejs_buildpack
+  - name: bookclub-destination-content
+    type: com.sap.application.content
+    requires:
+      - name: bookclub-destination-service
+        parameters:
+          content-target: true
+      - name: bookclub_html_repo_host
+        parameters:
+          service-key:
+            name: bookclub_html_repo_host-key
+      - name: uaa_bookclub
+        parameters:
+          service-key:
+            name: uaa_bookclub-key
+    parameters:
+      content:
+        instance:
+          destinations:
+            - Name: bookclubapprouter_bookclub_html_repo_host
+              ServiceInstanceName: bookclub-html5-app-host-service
+              ServiceKeyName: bookclub_html_repo_host-key
+              sap.cloud.service: bookclubapprouter
+            - Authentication: OAuth2UserTokenExchange
+              Name: bookclubapprouter_uaa_bookclub
+              ServiceInstanceName: bookclub-xsuaa-service
+              ServiceKeyName: uaa_bookclub-key
+              sap.cloud.service: bookclubapprouter
+          existing_destinations_policy: ignore
+    build-parameters:
+      no-source: true
+resources:
+  - name: bookclub-db
+    type: com.sap.xs.hdi-container
+    parameters:
+      service: hana
+      service-plan: hdi-shared
+  - name: bookclub-destination-service
+    type: org.cloudfoundry.managed-service
+    parameters:
+      config:
+        HTML5Runtime_enabled: true
+        version: 1.0.0
+      service: destination
+      service-name: bookclub-destination-service
+      service-plan: lite
+  - name: bookclub_html_repo_host
+    type: org.cloudfoundry.managed-service
+    parameters:
+      service: html5-apps-repo
+      service-name: bookclub-html5-app-host-service
+      service-plan: app-host
+  - name: uaa_bookclub
+    type: org.cloudfoundry.managed-service
+    parameters:
+      path: ./xs-security.json
+      service: xsuaa
+      service-name: bookclub-xsuaa-service
+      service-plan: application
+      config:
+        xsappname: bookclub-${org}-${space}
+        tenant-mode: dedicated
+parameters:
+  enable-parallel-deployments: true
+build-parameters:
+  before-all:
+    - builder: custom
+      commands:
+        - npx cds build --production
