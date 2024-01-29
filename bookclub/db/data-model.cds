@@ -8,7 +8,7 @@ entity Books {
 
 entity CC_EMAIL{
 
-key ID    : Integer;
+key ID    : UUID;
 SYSTEM_ID : String;
 CLIENT : String;
 COMPANY_CODE : String;
